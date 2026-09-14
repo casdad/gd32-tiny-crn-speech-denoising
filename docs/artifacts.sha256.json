@@ -1,0 +1,32 @@
+[
+  {
+    "bytes": 868931,
+    "path": "training/runs/train/best.pt",
+    "sha256": "d5827a53347f3fa3969b0bff3f1b4580f55199bc7e1befeee9e281250879906b"
+  },
+  {
+    "bytes": 288746,
+    "path": "training/exports/train_gd32.onnx",
+    "sha256": "8e51eb8fe81fb2e63c69f5581cf86bd4132d57e6270ea5c3000d2e3a0f5fc3bd"
+  },
+  {
+    "bytes": 3592433,
+    "path": "firmware/app/User/nn_model_configure.c",
+    "sha256": "362d4d7571a7a17bd959527fa2c4a3d39e47460412b3aca16f13dc0d7237ce6a"
+  },
+  {
+    "bytes": 3592433,
+    "path": "firmware/benchmark/User/nn_model_configure.c",
+    "sha256": "362d4d7571a7a17bd959527fa2c4a3d39e47460412b3aca16f13dc0d7237ce6a"
+  },
+  {
+    "bytes": 2840372,
+    "path": "firmware/app/Middlewares/AI/GD_LIB_CM7_v210.lib",
+    "sha256": "4f0335c2d7e2a5ec19d448eb9f4e6effa3a0cec183d24f490be7524da58ec342"
+  },
+  {
+    "bytes": 2840372,
+    "path": "firmware/benchmark/Middlewares/AI/GD_LIB_CM7_v210.lib",
+    "sha256": "4f0335c2d7e2a5ec19d448eb9f4e6effa3a0cec183d24f490be7524da58ec342"
+  }
+]

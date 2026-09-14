@@ -1,0 +1,14 @@
+* -text
+*.md text eol=lf
+*.py text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.lib binary
+*.pt binary
+*.onnx binary
+*.png binary
+firmware/**/Drivers/** linguist-vendored
+firmware/**/Middlewares/** linguist-vendored
+firmware/**/RNNoise_src/** linguist-vendored
+firmware/**/User/nn_model_configure.c linguist-generated

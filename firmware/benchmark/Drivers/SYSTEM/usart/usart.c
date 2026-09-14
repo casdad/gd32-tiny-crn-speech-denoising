@@ -1,0 +1,193 @@
+/**
+ ****************************************************************************************************
+ * @file        usart.c
+ * @version     V1.1
+ * @brief       串口初始化代码，支持printf
+ ****************************************************************************************************
+ *
+ * V1.1
+ * 修改OS_SUPPORT_OS部分代码, 包含头文件改成"os.h"
+ *
+ ****************************************************************************************************
+ */
+
+#include "./SYSTEM/sys/sys.h"
+#include "./SYSTEM/usart/usart.h"
+
+extern volatile uint8_t g_perf_uart_enable;
+
+
+/* 如果使用os,则包含相关头文件即可 */
+#if SYS_SUPPORT_OS
+#include "os.h"   /* os 使用 */
+#endif
+
+/******************************************************************************************/
+/* 加入以下代码, 支持printf函数, 而不需要选择use MicroLIB */
+
+#if 1
+
+#if (__ARMCC_VERSION >= 6010050)            /* 使用AC6版本时 */
+__asm(".global __use_no_semihosting\n\t");  /* 声明不使用半主机模式 */
+__asm(".global __ARM_use_no_argv \n\t");    /* AC6需要声明main函数为无参数，否则有些工程可能会出现半主机模式 */
+
+#else
+/* 使用AC5版本时, 需要定义__FILE 和 不使用半主机模式 */
+#pragma import(__use_no_semihosting)
+
+struct __FILE
+{
+    int handle;
+    /* Whatever you require here. If the only file you are using is */
+    /* standard output using printf() for debugging, no file handling */
+    /* is required. */
+};
+
+#endif
+
+/* 不使用半主机模式，至少需要定义_ttywrch/_sys_exit/_sys_command_string函数,可同时兼容AC6和AC5模式 */
+int _ttywrch(int ch)
+{
+    ch = ch;
+    return ch;
+}
+
+/* 定义_sys_exit()以避免使用半主机模式 */
+void _sys_exit(int x)
+{
+    x = x;
+}
+
+char *_sys_command_string(char *cmd, int len)
+{
+    return NULL;
+}
+
+/* FILE 在stdio.h里面定义 */
+FILE __stdout;
+
+/* 重定义fputc函数, printf函数最终会通过调用fputc输出字符到串口 */
+int fputc(int ch, FILE *f)
+{
+    /*
+     * 论文表 6-2 测试专用：默认屏蔽普通调试 printf，
+     * 只允许 perf_print() 输出耗时统计，避免串口打印干扰计时结果。
+     */
+    if(g_perf_uart_enable == 0U) {
+        return ch;
+    }
+
+    while (RESET == usart_flag_get(USART_UX, USART_FLAG_TC));     /* 等待上一个字符发送完成 */
+
+    usart_data_transmit(USART_UX, (uint8_t)ch);                   /* 将要发送的字符 ch 写入到TDATA寄存器 */
+    return ch;
+}
+#endif
+
+/******************************************************************************************/
+
+#if USART_EN_RX       /* 如果使用接收功能 */
+
+/* 接收缓冲区,最大USART_REC_LEN个字节 */
+uint8_t g_usart_rx_buf[USART_REC_LEN];
+
+/*  接收状态
+ *  bit15，      接收完成标志
+ *  bit14，      接收到0x0d
+ *  bit13~0，    接收到的有效字节数目
+ */
+uint16_t g_usart_rx_sta = 0;
+
+/**
+ * @brief       串口中断服务函数
+ * @param       无
+ * @retval      无
+ */
+void USART_UX_IRQHandler(void)
+{
+    uint8_t rxdata;
+
+#if SYS_SUPPORT_OS
+    OSIntEnter();
+#endif
+
+    if(usart_interrupt_flag_get(USART_UX, USART_INT_FLAG_RBNE) != RESET)
+    {
+        rxdata = usart_data_receive(USART_UX);
+
+        if((g_usart_rx_sta & 0x8000) == 0)
+        {
+            /* 收到回车或换行，都认为一帧接收完成 */
+            if((rxdata == '\r') || (rxdata == '\n'))
+            {
+                if((g_usart_rx_sta & 0x3FFF) > 0)
+                {
+                    g_usart_rx_sta |= 0x8000;
+                }
+            }
+            else
+            {
+                g_usart_rx_buf[g_usart_rx_sta & 0x3FFF] = rxdata;
+                g_usart_rx_sta++;
+
+                if((g_usart_rx_sta & 0x3FFF) >= USART_REC_LEN)
+                {
+                    g_usart_rx_sta = 0;
+                }
+            }
+        }
+    }
+
+    usart_flag_clear(USART_UX, USART_FLAG_ORERR);
+
+#if SYS_SUPPORT_OS
+    OSIntExit();
+#endif
+}
+
+#endif
+
+/**
+ * @brief       串口初始化函数
+ * @param       baudrate: 波特率, 根据自己需要设置波特率值
+ * @retval      无
+ */
+void usart_init(uint32_t baudrate)
+{
+    /* IO 及 时钟配置 */
+    rcu_periph_clock_enable(USART_TX_GPIO_CLK);     /* 使能串口TX引脚时钟 */
+    rcu_periph_clock_enable(USART_RX_GPIO_CLK);     /* 使能串口RX引脚时钟 */
+    rcu_periph_clock_enable(USART_UX_CLK);          /* 使能串口时钟 */
+
+    /* 设置USARTx_TX引脚的复用功能选择 */
+    gpio_af_set(USART_TX_GPIO_PORT, USART_TX_GPIO_AF, USART_TX_GPIO_PIN);
+
+    /* 设置USARTx_RX引脚的复用功能选择 */
+    gpio_af_set(USART_RX_GPIO_PORT, USART_RX_GPIO_AF, USART_RX_GPIO_PIN);
+
+    /* USARTx_TX引脚的模式设置 */
+    gpio_mode_set(USART_TX_GPIO_PORT, GPIO_MODE_AF, GPIO_PUPD_PULLUP, USART_TX_GPIO_PIN);
+    gpio_output_options_set(USART_TX_GPIO_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, USART_TX_GPIO_PIN);
+
+    /* USARTx_RX引脚的模式设置 */
+    gpio_mode_set(USART_RX_GPIO_PORT, GPIO_MODE_AF, GPIO_PUPD_PULLUP, USART_RX_GPIO_PIN);
+    gpio_output_options_set(USART_RX_GPIO_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, USART_RX_GPIO_PIN);
+
+    /* 配置USART的参数 */
+    usart_deinit(USART_UX);                                 /* 复位USARTx */
+    usart_baudrate_set(USART_UX, baudrate);                 /* 设置波特率 */
+    usart_stop_bit_set(USART_UX, USART_STB_1BIT);           /* 一个停止位 */
+    usart_word_length_set(USART_UX, USART_WL_8BIT);         /* 字长为8位数据格式 */
+    usart_parity_config(USART_UX, USART_PM_NONE);           /* 无奇偶校验位 */
+    usart_transmit_config(USART_UX, USART_TRANSMIT_ENABLE); /* 使能串口发送 */
+
+#if USART_EN_RX                                             /* 如果使用接收功能 */
+    /* 使能接收中断 */
+    usart_receive_config(USART_UX, USART_RECEIVE_ENABLE);   /* 使能串口接收 */
+    usart_interrupt_enable(USART_UX, USART_INT_RBNE);       /* 使能接收缓冲区非空中断 */
+    /* 配置NVIC，并设置中断优先级 */
+    nvic_irq_enable(USART_UX_IRQn, 3, 3);                   /* 抢占2，抢占优先级3，子优先级3 */
+#endif
+
+    usart_enable(USART_UX);	                                /* 使能串口 */
+}

@@ -1,0 +1,56 @@
+run_name: tiny_crn_48k_smoke
+seed: 1234
+
+# 48 kHz smoke-test config for GD32H759 audio board.
+# 48000 Hz, 480-sample hop = 10 ms, matching your board frame.
+sample_rate: 48000
+segment_seconds: 2.0
+n_fft: 1024
+win_length: 960
+hop_length: 480
+n_bands: 32
+context_frames: 8
+
+snr_min_db: -5.0
+snr_max_db: 20.0
+speech_gain_min_db: -6.0
+speech_gain_max_db: 3.0
+
+model:
+  conv_channels: 8
+  pointwise_channels: 16
+  lstm_hidden: 32
+  lstm_layers: 1
+  dropout: 0.0
+
+train:
+  epochs: 2
+  steps_per_epoch: 200
+  val_steps: 40
+  batch_size: 16
+  num_workers: 0
+  lr: 0.001
+  weight_decay: 0.000001
+  amp: true
+  grad_clip: 5.0
+  mask_loss_weight: 1.0
+  mag_loss_weight: 0.5
+
+paths:
+  train_clean_list: filelists/train_clean.txt
+  train_noise_list: filelists/train_noise.txt
+  val_clean_list: filelists/val_clean.txt
+  val_noise_list: filelists/val_noise.txt
+  out_dir: runs
+
+
+# 训练过程可视化：只保存图片/CSV/TXT，不影响模型和导出。
+visualize:
+  enabled: true
+  every_n_epochs: 1
+  sample_index: 0
+  fig_dir: figures
+  save_waveform: true
+  save_wav_spectrum: true
+  save_wav_audio: false
+  metrics_txt: true
