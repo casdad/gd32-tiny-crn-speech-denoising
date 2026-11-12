@@ -1,24 +1,51 @@
-# 基于 GD32H759I 的 Tiny-CRN 边缘语音降噪系统
+<div align="center">
+
+# GD32 Tiny-CRN 语音降噪
+
+**在 GD32H759I 上运行 Tiny-CRN：从 PyTorch 训练到 INT8 板端推理的完整边缘语音降噪工程**
+
+固件 · 板端性能测试 · 训练 · 评估 · ONNX 导出
+
+![MCU](https://img.shields.io/badge/MCU-GD32H759I-0b5cad)
+![Core](https://img.shields.io/badge/Core-Cortex--M7-6f42c1)
+![Model](https://img.shields.io/badge/Tiny--CRN-71%2C248%20params-2ea44f)
+![Sample Rate](https://img.shields.io/badge/Sample%20Rate-48%20kHz-0e8a7d)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.5.1-EE4C2C?logo=pytorch&logoColor=white)
+![ONNX](https://img.shields.io/badge/ONNX-opset%2013-005CED?logo=onnx&logoColor=white)
+![License](https://img.shields.io/badge/License-See%20notices-lightgrey)
+
+[项目简介](#项目简介) · [核心特性](#核心特性) · [规格](#硬件与模型规格) · [快速开始](#快速开始) · [实验结果](#已有实验记录) · [已知限制](#验证与已知限制)
+
+</div>
+
+---
+
+## 项目简介
 
 面向嵌入式语音增强的软硬件项目，包含 **GD32H759I 开发板固件、板端性能测试工程、PyTorch 模型训练、离线评估与 ONNX 导出**。
 
-采用轻量级卷积循环网络（Tiny-CRN）预测频带掩蔽，在微控制器上完成语音降噪处理，并提供 LCD 触摸交互、波形显示和 TF 卡 WAV 录音。
+系统采用轻量级卷积循环网络（Tiny-CRN）预测频带掩蔽，在微控制器上完成语音降噪处理，并提供 LCD 触摸交互、波形显示和 TF 卡 WAV 录音。
 
-## 项目实物
-
-<p align="center">
-  <img src="./docs/images/project-hardware.png" alt="基于 GD32H759I 的 Tiny-CRN 边缘语音降噪系统实物图" width="900">
-</p>
-
+> [!WARNING]
 > **当前实现边界**：录音时优先采集并保存原始音频，停止录音后在板端离线生成 CRN / RNNoise 降噪文件。非录音状态下提供低频刷新预览，**不是连续 10 ms 全链路实时 CRN 降噪或实时耳返系统**。板端量化映射仍需与转换工具的精确参数进一步对齐。
 
-## 项目内容
+## 实物与效果
 
-- **主固件**：SAI/TDM 音频采集、DMA 双缓冲、SDRAM 软件队列、LCD 波形、触摸控制及 TF 卡文件管理。
-- **降噪算法**：Tiny-CRN 频带掩蔽推理；保留 RNNoise 作为另一种处理模式。
-- **性能测试版**：通过 Cortex-M7 DWT 周期计数器统计采集、特征提取、推理、重建、刷屏及写卡耗时。
-- **训练与部署**：在线混噪数据集、训练与可视化、单文件降噪、批量评估、ONNX 导出及 INT8 校准数据生成。
-- **已有模型**：保留提交材料中的 `best.pt`、ONNX 和板端生成的 C 模型参数，便于继续实验。
+<p align="center">
+  <img src="./docs/images/project-hardware.png" alt="基于 GD32H759I 的 Tiny-CRN 边缘语音降噪系统实物图" width="880">
+</p>
+
+<p align="center"><em>GD32H759I 开发板 + ES7210 采集 + LCD 触摸交互 + TF 卡录音</em></p>
+
+## 核心特性
+
+| 模块 | 内容 |
+|---|---|
+| **主固件** | SAI/TDM 音频采集、DMA 双缓冲、SDRAM 软件队列、LCD 波形、触摸控制及 TF 卡文件管理 |
+| **降噪算法** | Tiny-CRN 频带掩蔽推理；保留 RNNoise 作为另一种处理模式 |
+| **性能测试版** | 通过 Cortex-M7 DWT 周期计数器统计采集、特征提取、推理、重建、刷屏及写卡耗时 |
+| **训练与部署** | 在线混噪数据集、训练与可视化、单文件降噪、批量评估、ONNX 导出及 INT8 校准数据生成 |
+| **已有模型** | 保留提交材料中的 `best.pt`、ONNX 和板端生成的 C 模型参数，便于继续实验 |
 
 ## 系统流程
 
@@ -34,38 +61,12 @@ PC 训练与导出
   -> TF 卡降噪 WAV
 ```
 
-## 仓库结构
+## 硬件与模型规格
 
-```text
-firmware/
-  app/                 主固件，包含完整驱动、AI 库和 Keil 工程
-  benchmark/           独立的板端性能测试工程
-training/
-  configs/             48 kHz 正式 / 轻量 / 冒烟配置及 16 kHz 实验配置
-  tinycrn/             模型、音频处理、特征、数据集和可视化
-  tools/               文件列表生成与实验绘图工具
-  train.py             模型训练
-  eval_denoise.py       单个音频文件降噪
-  eval.py              多噪声、多 SNR 评估
-  export_onnx.py        ONNX 导出
-  make_npz_for_gd32.py  校准数据生成
-  main.py              一键串联训练与导出
-  runs/train/best.pt   原始训练权重
-  exports/             原始 ONNX 模型
-docs/
-  PROJECT_ANALYSIS.md  源码分析、限制与后续改进方向
-  SOURCE_MAP.md        原始材料与仓库的对应关系
-  VALIDATION.md        本次整理的验证记录
-  results/             原始训练曲线、训练日志和评估汇总
-tools/                 仓库完整性检查和 PC 冒烟测试
-```
-
-`firmware/app` 和 `firmware/benchmark` 是两个可独立打开的工程，保留原有相对路径，避免重构驱动布局影响 Keil 构建。原目录名虽为 `GD32H779I`，工程实际选择的器件为 **GD32H759IM**，因此以工程配置为准。
-
-## 硬件与开发环境
+### 硬件与开发环境
 
 | 项目 | 源码 / 工程配置 |
-| --- | --- |
+|---|---|
 | 主控 | GD32H759IM，Cortex-M7 |
 | 音频采集 | ES7210，SAI/TDM，48 kHz |
 | 音频输出 | 含 ES8311 驱动；默认 `ENABLE_ES8311_OUTPUT=0` |
@@ -78,20 +79,7 @@ tools/                 仓库完整性检查和 PC 冒烟测试
 
 本仓库不包含开发板原理图或通用接线保证。更换开发板时，应核对音频接口、LCD、触摸、SDRAM 和 TF 卡引脚。
 
-## 开发板编译与使用
-
-1. 安装 Keil MDK、匹配的设备包与 Arm Compiler。
-2. 主固件打开 `firmware/app/Projects/MDK-ARM/GD32H759.uvprojx`。
-3. 性能测试打开 `firmware/benchmark/Projects/MDK-ARM/GD32H759.uvprojx`。
-4. 选择现有 `USART` target。该名称是历史工程名称，实际应用为语音采集和降噪。
-5. 在 Keil 中按实际硬件设置下载器与 Flash 下载选项，执行 Rebuild，再下载到开发板。
-6. 插入已格式化且可写的 TF 卡，使用触摸界面切换声道、增益及 RAW / RNN / CRN 模式，开始或停止录音。
-
-录音比较文件使用 `CMPxxxx.WAV` 命名；停止后按模式生成 `RNNxxxx.WAV` 或 `CRNxxxx.WAV`。默认固件不会自动格式化 TF 卡。具体声道内容和生成条件见 `User/sd_wav_recorder.c` 与 `User/main.c`。
-
-> 本次仓库整理不等于重新完成硬件验证；未在连接开发板的 Keil 环境中重新编译、烧录或测量耗时。
-
-## 模型结构与参数
+### 模型结构
 
 ```text
 [B, 8, 32, 1]
@@ -104,7 +92,7 @@ tools/                 仓库完整性检查和 PC 冒烟测试
 ```
 
 | 参数 | 正式配置 |
-| --- | --- |
+|---|---|
 | 采样率 | 48000 Hz |
 | FFT / 窗长 / 帧移 | 1024 / 960 / 480 点 |
 | 帧移时间 | 10 ms（不代表总系统延迟） |
@@ -117,7 +105,23 @@ tools/                 仓库完整性检查和 PC 冒烟测试
 
 配置中的 `steps_per_epoch=40000` 实际传给 Dataset 长度，表示每轮 **40,000 个样本**，不是 40,000 次优化器更新。详细实现见 `training/train.py` 和 `training/tinycrn/dataset.py`。
 
-## PC 端快速开始
+## 快速开始
+
+### 固件编译
+
+1. 安装 Keil MDK、匹配的设备包与 Arm Compiler。
+2. 主固件打开 `firmware/app/Projects/MDK-ARM/GD32H759.uvprojx`。
+3. 性能测试打开 `firmware/benchmark/Projects/MDK-ARM/GD32H759.uvprojx`。
+4. 选择现有 `USART` target。该名称是历史工程名称，实际应用为语音采集和降噪。
+5. 在 Keil 中按实际硬件设置下载器与 Flash 下载选项，执行 Rebuild，再下载到开发板。
+6. 插入已格式化且可写的 TF 卡，使用触摸界面切换声道、增益及 RAW / RNN / CRN 模式，开始或停止录音。
+
+录音比较文件使用 `CMPxxxx.WAV` 命名；停止后按模式生成 `RNNxxxx.WAV` 或 `CRNxxxx.WAV`。默认固件不会自动格式化 TF 卡。具体声道内容和生成条件见 `User/sd_wav_recorder.c` 与 `User/main.c`。
+
+> [!NOTE]
+> 本次仓库整理不等于重新完成硬件验证；未在连接开发板的 Keil 环境中重新编译、烧录或测量耗时。
+
+### PC 端训练与评估
 
 以下命令从仓库根目录执行。建议使用独立 Python 虚拟环境；PyTorch 按机器的 CPU / CUDA 环境单独安装。
 
@@ -132,7 +136,7 @@ python -m pip install -r requirements.txt
 
 上述 PyTorch 版本用于复现当前导出接口；CPU-only 安装可在该命令末尾添加 `--index-url https://download.pytorch.org/whl/cpu`。如升级 PyTorch，需重新检查 ONNX exporter 行为和 checkpoint 加载兼容性，不保证所有未来版本直接适用。
 
-### 1. 准备训练数据
+**1. 准备训练数据**
 
 将自行获取并获准使用的干净语音和噪声音频分别放入 `training/data/clean` 和 `training/data/noise`。原始数据集、个人录音和本机绝对路径列表不随仓库发布。
 
@@ -142,7 +146,7 @@ python tools/build_filelists.py --clean_root data/clean --noise_root data/noise 
 
 脚本按文件随机划分 90% / 5% / 剩余部分。请确认训练、验证、测试列表均非空；少于 20 个文件的类别可能得到空验证集。严谨实验还应按说话人 / 录音来源隔离，避免同源数据泄漏。
 
-### 2. 训练
+**2. 训练**
 
 ```bash
 # 先检查小规模训练流程
@@ -154,7 +158,7 @@ python train.py --config configs/train.yaml --run_name my_train
 
 产物位于 `runs/<run_name>/`，包括 `best.pt`、`last.pt`、训练日志与曲线。复用已有 run_name 会覆盖同名产物；一键入口 `main.py` 会自动选择新实验名。
 
-### 3. 使用已有权重降噪
+**3. 使用已有权重降噪**
 
 将待测试音频放到 `training/examples/noisy.wav`，然后运行：
 
@@ -164,26 +168,31 @@ python eval_denoise.py --ckpt runs/train/best.pt --wav examples/noisy.wav --out 
 
 运行 `python eval.py` 可进行批量评估；先生成测试文件列表，并按实际噪声内容核对脚本中的 `TEST_CASES`。若要计算 STOI / PESQ，再安装 `requirements-eval.txt`。不要把未计算的指标当成零分。
 
-### 4. 导出和量化校准
+### 导出与板端部署
 
 ```bash
 python export_onnx.py --ckpt runs/my_train/best.pt --out exports/my_train_gd32.onnx
 python make_npz_for_gd32.py --config configs/train.yaml --clean_list filelists/val_clean.txt --noise_list filelists/val_noise.txt --out exports/my_train_calibration.npz --num_samples 256
 ```
 
-- PyTorch 输入：`[B, 8, 32, 1]`。
-- ONNX 固定输入：`[1, 1, 8, 32]`，输出：`[1, 32]`，opset 13。
-- 校准 NPZ：`data` 键，`float32 [N, 8, 32, 1]`，供转换工具使用。
-- 板端接口：`int8[256] -> int8[32]`。
+| 项目 | 规格 |
+|---|---|
+| PyTorch 输入 | `[B, 8, 32, 1]` |
+| ONNX 固定输入 | `[1, 1, 8, 32]`，输出 `[1, 32]`，opset 13 |
+| 校准 NPZ | `data` 键，`float32 [N, 8, 32, 1]` |
+| 板端接口 | `int8[256] -> int8[32]` |
 
-将 ONNX 与校准 NPZ 导入 GD Embedded AI Tool，使用适配 Cortex-M7 的生成结果更新板端模型及必要运行库。**务必核对转换后的输入布局、scale / zero_point、算子支持和缓冲大小**；不能只替换权重便认定完成部署。
+将 ONNX 与校准 NPZ 导入 GD Embedded AI Tool，使用适配 Cortex-M7 的生成结果更新板端模型及必要运行库。
+
+> [!IMPORTANT]
+> 务必核对转换后的输入布局、scale / zero_point、算子支持和缓冲大小；**不能只替换权重便认定完成部署**。
 
 ## 已有实验记录
 
 以下数字直接摘自提交材料中的 PC 离线评估 CSV，**不是本次重新测试的结果，也不是板端实测效果**。STOI / PESQ 原始列为空。噪声名称来自原评估脚本，需结合真实文件重新核对。
 
 | 原记录噪声标签 | 输入 SNR / dB | CRN 输出 SNR / dB | 提升 / dB |
-| --- | ---: | ---: | ---: |
+|---|---:|---:|---:|
 | 风扇 / 空调噪声 | -5 | 1.1635 | 6.1635 |
 | 键盘敲击噪声 | 0 | 3.5870 | 3.5871 |
 | 室内人声背景 | 5 | 7.0744 | 2.0744 |
@@ -191,7 +200,37 @@ python make_npz_for_gd32.py --config configs/train.yaml --clean_list filelists/v
 
 详见 `docs/results/evaluation_summary.csv` 与 `docs/results/train_log.csv`。
 
-![原始训练损失曲线](docs/results/loss_curve.png)
+<p align="center">
+  <img src="./docs/results/loss_curve.png" alt="原始训练损失曲线" width="720">
+</p>
+
+## 仓库结构
+
+```text
+firmware/
+  app/                 主固件，包含完整驱动、AI 库和 Keil 工程
+  benchmark/           独立的板端性能测试工程
+training/
+  configs/             48 kHz 正式 / 轻量 / 冒烟配置及 16 kHz 实验配置
+  tinycrn/             模型、音频处理、特征、数据集和可视化
+  tools/               文件列表生成与实验绘图工具
+  train.py             模型训练
+  eval_denoise.py      单个音频文件降噪
+  eval.py              多噪声、多 SNR 评估
+  export_onnx.py       ONNX 导出
+  make_npz_for_gd32.py 校准数据生成
+  main.py              一键串联训练与导出
+  runs/train/best.pt   原始训练权重
+  exports/             原始 ONNX 模型
+docs/
+  PROJECT_ANALYSIS.md  源码分析、限制与后续改进方向
+  SOURCE_MAP.md        原始材料与仓库的对应关系
+  VALIDATION.md        本次整理的验证记录
+  results/             原始训练曲线、训练日志和评估汇总
+tools/                 仓库完整性检查和 PC 冒烟测试
+```
+
+`firmware/app` 和 `firmware/benchmark` 是两个可独立打开的工程，保留原有相对路径，避免重构驱动布局影响 Keil 构建。原目录名虽为 `GD32H779I`，工程实际选择的器件为 **GD32H759IM**，因此以工程配置为准。
 
 ## 验证与已知限制
 
@@ -213,10 +252,20 @@ python tools/pipeline_test.py ../pipeline-validation-new
 - 16 kHz 配置仅用于独立实验，不能直接替换当前 48 kHz 板端配置。
 - 本仓库没有重新宣称实时性能、板端 PESQ/STOI 或 PC/MCU 数值等价。
 
-进一步分析见 `docs/PROJECT_ANALYSIS.md`，本次验证范围见 `docs/VALIDATION.md`。
+进一步分析见 [PROJECT_ANALYSIS.md](docs/PROJECT_ANALYSIS.md)，本次验证范围见 [VALIDATION.md](docs/VALIDATION.md)。
 
-## 发布与第三方代码
+## 第三方代码与许可
 
-保留原有源码版权声明。GD32 驱动 / AI 库、Arm CMSIS、FatFs、RNNoise 等遵循各自许可，详见 `THIRD_PARTY_NOTICES.md`。本次整理不擅自为整个项目附加 MIT 等统一授权。
+保留原有源码版权声明。GD32 驱动 / AI 库、Arm CMSIS、FatFs、RNNoise 等遵循各自许可，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+本次整理不擅自为整个项目附加 MIT 等统一授权。
 
 仓库不包含竞赛论文、个人信息材料、演示视频、完整数据集、IDE 私有配置、编译产物、每轮重复图表及校准 NPZ；这些仍保留在原始提交材料中。
+
+---
+
+<div align="center">
+
+如果这个项目对你有帮助，欢迎点一个 ⭐ Star。
+
+</div>
